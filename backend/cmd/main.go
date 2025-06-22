@@ -46,11 +46,15 @@ func main() {
 		Config: koanf,
 	}
 
-	handler := &handler.Handler{
+	handlers := &handler.Handler{
 		Config: serverConfig,
 	}
 
-	httprouter.GET("/hello", handler.HelloPrint)
+	httprouter.POST("/login", handlers.Login)
+	httprouter.POST("/register", handlers.Register)
+	httprouter.GET("/api/userinfo", handlers.AuthMiddleware(handlers.GetUserInfo))
+	httprouter.POST("/api/conversations/:id/messages", handlers.AuthMiddleware(handlers.SendMessage))
+	httprouter.GET("/api/conversations/:id/messages", handlers.AuthMiddleware(handlers.GetMessages))
 
 	httprouter.PanicHandler = exception.ErrorHandler
 
