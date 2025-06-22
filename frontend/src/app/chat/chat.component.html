@@ -1,0 +1,82 @@
+<div class="flex h-screen">
+  <!-- Sidebar for desktop -->
+  <aside class="hidden md:block w-64 bg-gray-100 border-r">
+    <div class="p-4 font-bold text-lg border-b">Chats</div>
+    <ul class="divide-y">
+      <li class="p-4 hover:bg-gray-200 cursor-pointer">Alice</li>
+      <li class="p-4 hover:bg-gray-200 cursor-pointer">Bob</li>
+      <li class="p-4 hover:bg-gray-200 cursor-pointer">Charlie</li>
+    </ul>
+  </aside>
+
+  <!-- Mobile sidebar drawer -->
+  <div
+    class="fixed inset-0 bg-black bg-opacity-50 z-50 md:hidden"
+    *ngIf="showSidebar"
+    (click)="showSidebar = false"
+  >
+    <div
+      class="w-64 h-full bg-white shadow-lg p-4"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="font-bold text-lg mb-4">Chats</div>
+      <ul class="divide-y">
+        <li class="p-4 hover:bg-gray-200 cursor-pointer">Alice</li>
+        <li class="p-4 hover:bg-gray-200 cursor-pointer">Bob</li>
+        <li class="p-4 hover:bg-gray-200 cursor-pointer">Charlie</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Chat main -->
+  <div class="flex-1 flex flex-col">
+    <!-- Header -->
+    <div class="p-4 border-b bg-white shadow flex items-center justify-between">
+      <!-- Hamburger for mobile -->
+      <button
+        class="md:hidden text-gray-600"
+        (click)="showSidebar = true"
+        aria-label="Open chat list"
+      >
+        <svg
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 6h16M4 12h16M4 18h16"
+          ></path>
+        </svg>
+      </button>
+      <h2 class="text-xl font-semibold">Chat with Alice</h2>
+      <div class="w-6 h-6"></div> <!-- Spacer -->
+    </div>
+
+    <!-- Messages -->
+    <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+      <div class="flex justify-start">
+        <div class="bg-white p-3 rounded-lg shadow max-w-xs">Hi! How are you?</div>
+      </div>
+      <div class="flex justify-end">
+        <div class="bg-blue-500 text-white p-3 rounded-lg shadow max-w-xs">I'm good, thanks!</div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="border-t p-4 bg-white flex gap-2">
+      <input
+        type="text"
+        class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring"
+        placeholder="Type your message..."
+      />
+      <button class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+        Send
+      </button>
+    </div>
+  </div>
+</div>
