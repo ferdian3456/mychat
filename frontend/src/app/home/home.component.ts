@@ -16,7 +16,7 @@ export class HomeComponent {
     this.router.navigate(["/login"])
   }
 
-  goToRegister(){
-    this.router.navigate(["/register"])
+  goToChat(){
+    this.router.navigate(["/chat"])
   }
 }

@@ -16,10 +16,15 @@ import (
 
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Access-Control-Allow-Origin", "*")
-		writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		writer.Header().Set("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, Authorization")
-		writer.Header().Set("Access-Control-Allow-Credentials", "True")
+		origin := request.Header.Get("Origin")
+
+		if origin == "http://localhost:4200" {
+			writer.Header().Set("Access-Control-Allow-Origin", origin)
+			writer.Header().Set("Access-Control-Allow-Credentials", "true")
+			writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			writer.Header().Set("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, Authorization")
+		}
+
 		if request.Method == http.MethodOptions {
 			writer.WriteHeader(http.StatusOK)
 			return

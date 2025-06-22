@@ -96,8 +96,8 @@ func (h *Handler) Register(writer http.ResponseWriter, request *http.Request, pa
 	secretKeyAccess := h.Config.Config.String("SECRET_KEY_ACCESS_TOKEN")
 	secretKeyAccessByte := []byte(secretKeyAccess)
 
-	expirationTime := now.Add(1 * time.Hour)
-	expirationTimeInUnix := now.Add(1 * time.Hour).Unix()
+	expirationTime := now.Add(24 * time.Hour)
+	expirationTimeInUnix := now.Add(24 * time.Hour).Unix()
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"id":  user.Id,
 		"exp": expirationTimeInUnix,
@@ -111,10 +111,10 @@ func (h *Handler) Register(writer http.ResponseWriter, request *http.Request, pa
 	cookie := &http.Cookie{
 		Name:     "access_token",
 		Value:    accessTokenString,
-		Path:     "/api/",
+		Path:     "/",
 		HttpOnly: true,
 		Secure:   false,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteNoneMode,
 		Expires:  expirationTime,
 	}
 
@@ -194,8 +194,8 @@ func (h *Handler) Login(writer http.ResponseWriter, request *http.Request, param
 	secretKeyAccessByte := []byte(secretKeyAccess)
 
 	now := time.Now()
-	expirationTime := now.Add(1 * time.Hour)
-	expirationTimeInUnix := now.Add(1 * time.Hour).Unix()
+	expirationTime := now.Add(24 * time.Hour)
+	expirationTimeInUnix := now.Add(24 * time.Hour).Unix()
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"id":  userFromDB.Id,
 		"exp": expirationTimeInUnix,
@@ -209,10 +209,10 @@ func (h *Handler) Login(writer http.ResponseWriter, request *http.Request, param
 	cookie := &http.Cookie{
 		Name:     "access_token",
 		Value:    accessTokenString,
-		Path:     "/api/",
+		Path:     "/",
 		HttpOnly: true,
 		Secure:   false,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteNoneMode,
 		Expires:  expirationTime,
 	}
 

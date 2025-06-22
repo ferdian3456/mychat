@@ -17,4 +17,8 @@ export class ApiService {
   register(url: string, data: any) {
     return this.http.post(this.baseUrl + url, data, { withCredentials: true });
   }
+
+  getUserInfo(url: string) {
+    return this.http.get(this.baseUrl + url, { withCredentials: true });
+  }
 }
