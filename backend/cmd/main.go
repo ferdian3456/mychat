@@ -42,13 +42,15 @@ func main() {
 	httprouter := config.NewHttpRouter()
 	zap := config.NewZap()
 	koanf := config.NewKoanf(zap)
+	rdb := config.NewRedis(koanf, zap)
 	postgresql := config.NewPostgresqlPool(koanf, zap)
 
 	serverConfig := config.ServerConfig{
-		Router: httprouter,
-		DB:     postgresql,
-		Log:    zap,
-		Config: koanf,
+		Router:  httprouter,
+		DB:      postgresql,
+		DBCache: rdb,
+		Log:     zap,
+		Config:  koanf,
 	}
 
 	handlers := &handler.Handler{
@@ -58,8 +60,12 @@ func main() {
 	httprouter.POST("/login", handlers.Login)
 	httprouter.POST("/register", handlers.Register)
 	httprouter.GET("/api/userinfo", handlers.AuthMiddleware(handlers.GetUserInfo))
-	httprouter.POST("/api/conversations/:id/messages", handlers.AuthMiddleware(handlers.SendMessage))
-	httprouter.GET("/api/conversations/:id/messages", handlers.AuthMiddleware(handlers.GetMessages))
+	httprouter.POST("/api/conversation", handlers.AuthMiddleware(handlers.CreateConversation))
+	httprouter.GET("/api/ws-token", handlers.AuthMiddleware(handlers.GetWebsocketToken))
+	httprouter.HandlerFunc("GET", "/api/ws", handlers.WebSocketAuthMiddleware(handlers.WebSocket))
+	httprouter.GET("/api/conversation/:id/messages", handlers.AuthMiddleware(handlers.GetMessage))
+	//httprouter.POST("/api/conversations/:id/messages", handlers.AuthMiddleware(handlers.SendMessage))
+	//httprouter.GET("/api/conversations/:id/messages", handlers.AuthMiddleware(handlers.GetMessages))
 
 	httprouter.PanicHandler = exception.ErrorHandler
 

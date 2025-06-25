@@ -3,16 +3,60 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/julienschmidt/httprouter"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"mychat/helper"
 	"net/http"
 )
 
+func (h *Handler) WebSocketAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Println("got into middleware")
+		errorMap := map[string]string{}
+
+		ctx := request.Context()
+
+		// Get token from URL query parameter
+		wsToken := request.URL.Query().Get("websocket_token")
+		if wsToken == "" {
+			errorMap["auth"] = "no token provided in query"
+			helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+			return
+		}
+
+		fmt.Println("ws token", wsToken)
+
+		userUUID, err := h.Config.DBCache.Get(ctx, "ws_token:"+wsToken).Result()
+		if err == redis.Nil {
+			errorMap["auth"] = "invalid or expired ws token"
+			helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+			return
+		} else if err != nil {
+			h.Config.Log.Panic("redis error", zap.Error(err))
+		}
+
+		if len(errorMap) > 0 {
+			helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+			return
+		}
+
+		h.Config.DBCache.Del(ctx, "ws_token:"+wsToken)
+
+		// Add user info to context
+		ctx = context.WithValue(ctx, "user_uuid", userUUID)
+		request = request.WithContext(ctx)
+
+		next(writer, request)
+	}
+}
+
 func (h *Handler) AuthMiddleware(next httprouter.Handle) httprouter.Handle {
 	return func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+		fmt.Println("got into middleware")
 		var err error
 		errorMap := map[string]string{}
 
