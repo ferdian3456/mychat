@@ -4,7 +4,7 @@ import { HomeComponent } from './home/home.component';
 import { LoginComponent } from './login/login.component';
 import { RegisterComponent } from './register/register.component';
 import { ChatComponent } from './chat/chat.component';
-import { AuthGuard } from './auth.guard';
+import { ChatListComponent } from './chat-list/chat-list.component';
 
 const routes: Routes = [
   {
@@ -20,13 +20,17 @@ const routes: Routes = [
     component: LoginComponent
   },
   {
-    path:'chat',
-    component: ChatComponent,
-    canActivate:[AuthGuard]
+    path:'chat/:id',
+    component: ChatComponent
+  },
+  {
+    path:'chat-list',
+    component: ChatListComponent
   },
   {
     path:'**',
-    redirectTo:'home'
+    redirectTo:'home',
+    pathMatch: 'full'
   }
 ];
 

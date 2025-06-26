@@ -10,6 +10,7 @@ import { LoginComponent } from './login/login.component';
 import { HttpClientModule } from '@angular/common/http';
 import { ChatComponent } from './chat/chat.component';
 import { CookieService } from 'ngx-cookie-service';
+import { ChatListComponent } from './chat-list/chat-list.component';
 
 @NgModule({
   declarations: [
@@ -17,7 +18,8 @@ import { CookieService } from 'ngx-cookie-service';
     HomeComponent,
     RegisterComponent,
     LoginComponent,
-    ChatComponent
+    ChatComponent,
+    ChatListComponent
   ],
   imports: [
     BrowserModule,

@@ -114,7 +114,7 @@ func (h *Handler) Register(writer http.ResponseWriter, request *http.Request, pa
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   false,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: http.SameSiteLaxMode,
 		Expires:  expirationTime,
 	}
 
@@ -212,7 +212,7 @@ func (h *Handler) Login(writer http.ResponseWriter, request *http.Request, param
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   false,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: http.SameSiteLaxMode,
 		Expires:  expirationTime,
 	}
 
@@ -233,4 +233,45 @@ func (h *Handler) GetUserInfo(writer http.ResponseWriter, request *http.Request,
 	}
 
 	helper.WriteSuccessResponse(writer, user)
+}
+
+func (h *Handler) GetAllUserData(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+	ctx := request.Context()
+
+	errorMap := map[string]string{}
+
+	userUUID, _ := ctx.Value("user_uuid").(string)
+
+	query := "SELECT id,username FROM users WHERE id!=$1"
+
+	rows, err := h.Config.DB.Query(ctx, query, userUUID)
+	if err != nil {
+		h.Config.Log.Panic("failed to query into database", zap.Error(err))
+	}
+
+	defer rows.Close()
+
+	var users []model.AllUserInfoResponse
+	hasData := false
+
+	for rows.Next() {
+		var user model.AllUserInfoResponse
+		err = rows.Scan(&user.Id, &user.Username)
+		if err != nil {
+			h.Config.Log.Panic("failed to scan query result", zap.Error(err))
+		}
+		users = append(users, user)
+		hasData = true
+	}
+
+	if hasData == false {
+		errorMap["user"] = "user not found"
+	}
+
+	if len(errorMap) > 0 {
+		helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+		return
+	}
+
+	helper.WriteSuccessResponse(writer, users)
 }

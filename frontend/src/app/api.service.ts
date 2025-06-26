@@ -21,4 +21,24 @@ export class ApiService {
   getUserInfo(url: string) {
     return this.http.get(this.baseUrl + url, { withCredentials: true });
   }
+
+  getAllUserInfo(url: string) {
+    return this.http.get(this.baseUrl + url, { withCredentials: true });
+  }
+
+  createOrGetConversation(url:string,data:any) {
+    return this.http.post(this.baseUrl + url, data, { withCredentials: true});
+  }
+
+  getAllParticipantInfo(url:string){
+    return this.http.get(this.baseUrl + url, { withCredentials: true });
+  }
+
+  getAllPastMessages(url:string){
+      return this.http.get(this.baseUrl + url, { withCredentials: true });
+  }
+
+  getWebsocketToken(url:string) {
+    return this.http.get(this.baseUrl + url, { withCredentials: true });
+  }
 }

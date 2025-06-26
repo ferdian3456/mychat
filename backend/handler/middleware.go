@@ -15,7 +15,6 @@ import (
 
 func (h *Handler) WebSocketAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		fmt.Println("got into middleware")
 		errorMap := map[string]string{}
 
 		ctx := request.Context()
@@ -56,7 +55,6 @@ func (h *Handler) WebSocketAuthMiddleware(next http.HandlerFunc) http.HandlerFun
 
 func (h *Handler) AuthMiddleware(next httprouter.Handle) httprouter.Handle {
 	return func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		fmt.Println("got into middleware")
 		var err error
 		errorMap := map[string]string{}
 

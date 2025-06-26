@@ -39,6 +39,11 @@ export class LoginComponent {
     return true;
   }
 
+  goBack() {
+    this.router.navigate(['/home']); // or use `location.back()` if using Angular's Location service
+  }
+
+
  doLogin() {
     this.errorMessage = '';
     this.loading = true;
@@ -58,16 +63,7 @@ export class LoginComponent {
       (resp) => {
         this.loading = false;
         this.resp = resp;
-         // 👇 Send a request to check if the cookie/session is valid
-        this.api.getUserInfo('api/userinfo').subscribe(
-          () => {
-            // ✅ Cookie is valid, now allow navigation
-            this.router.navigate(['/chat']);
-          },
-          () => {
-            this.errorMessage = 'Login succeeded, but session check failed.';
-          }
-        );
+        this.router.navigate(['/home']);
       },
       (error) => {
         this.loading = false;

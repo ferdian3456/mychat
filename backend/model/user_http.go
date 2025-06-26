@@ -14,3 +14,8 @@ type UserInfoResponse struct {
 	Id       string `json:"id"`
 	Username string `json:"username"`
 }
+
+type AllUserInfoResponse struct {
+	Id       string `json:"id"`
+	Username string `json:"username"`
+}

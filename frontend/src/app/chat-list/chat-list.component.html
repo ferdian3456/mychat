@@ -1,19 +1,19 @@
 <div class="flex h-screen">
-  <!-- Sidebar for desktop -->
+  <!-- Sidebar desktop -->
   <aside class="hidden md:block w-64 bg-gray-100 border-r">
     <div class="p-4 font-bold text-lg border-b">Chats</div>
     <ul class="divide-y">
-       <li
+      <li
         *ngFor="let user of users"
         (click)="goToChat(user.id)"
         class="p-4 hover:bg-gray-200 cursor-pointer"
       >
-        {{ user?.username }}
+        {{ user.username }}
       </li>
     </ul>
   </aside>
 
-  <!-- Mobile sidebar drawer -->
+  <!-- Mobile sidebar -->
   <div
     class="fixed inset-0 bg-black bg-opacity-50 z-50 md:hidden"
     *ngIf="showSidebar"
@@ -25,22 +25,21 @@
     >
       <div class="font-bold text-lg mb-4">Chats</div>
       <ul class="divide-y">
-         <li
+      <li
         *ngFor="let user of users"
         (click)="goToChat(user.id)"
         class="p-4 hover:bg-gray-200 cursor-pointer"
-        >
-          {{ user?.username}}
-        </li>
+      >
+        {{ user.username }}
+      </li>
       </ul>
     </div>
   </div>
 
-  <!-- Chat main -->
+  <!-- Main area -->
   <div class="flex-1 flex flex-col">
     <!-- Header -->
     <div class="p-4 border-b bg-white shadow flex items-center justify-between">
-      <!-- Hamburger for mobile -->
       <button
         class="md:hidden text-gray-600"
         (click)="showSidebar = true"
@@ -61,48 +60,13 @@
           ></path>
         </svg>
       </button>
-      <h2 class="text-xl font-semibold">Chat with {{userChat?.username}}</h2>
-      <div class="w-6 h-6"></div> <!-- Spacer -->
+      <h2 class="text-xl font-semibold">Select a user to chat</h2>
+      <div class="w-6 h-6"></div>
     </div>
 
-    <!-- Messages -->
-<div class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-  <div *ngFor="let msg of message">
-    <div
-      class="w-full flex"
-      [ngClass]="{
-        'justify-end': msg.sender_id === myUser.id,
-        'justify-start': msg.sender_id !== myUser.id
-      }"
-    >
-      <div
-        [ngClass]="{
-          'bg-blue-500 text-white': msg.sender_id === myUser.id,
-          'bg-white text-gray-800': msg.sender_id !== myUser.id
-        }"
-        class="p-3 rounded-lg shadow max-w-xs"
-      >
-        {{ msg.text }}
-      </div>
-    </div>
-  </div>
-</div>
-
-
-    <!-- Input -->
-    <div class="border-t p-4 bg-white flex gap-2">
-      <input
-        type="text"
-        [(ngModel)]="inputText"
-        class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring"
-        placeholder="Type your message..."
-      />
-      <button
-        (click)="sendMessage(inputText); inputText = ''"
-        class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
-      >
-        Send
-      </button>
+    <!-- Placeholder -->
+    <div class="flex-1 flex items-center justify-center text-gray-500">
+      Choose a conversation from the list.
     </div>
   </div>
 </div>

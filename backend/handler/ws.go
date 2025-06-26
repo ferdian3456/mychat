@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -17,35 +18,25 @@ import (
 	"time"
 )
 
-var upgrader = websocket.Upgrader{}
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(request *http.Request) bool {
+		return true
+	},
+}
 var connections = make(map[string]*websocket.Conn)
 
 func (h *Handler) WebSocket(writer http.ResponseWriter, request *http.Request) {
 	ctx := request.Context()
-	fmt.Println("got here1")
-
 	userUUID, _ := ctx.Value("user_uuid").(string)
-
-	errorMap := map[string]string{}
-
-	fmt.Println("got here-2")
 
 	conn, err := upgrader.Upgrade(writer, request, nil)
 	if err != nil {
-		errorMap["connection"] = "websocket upgrade error"
-		fmt.Println("woi", err)
+		// Can't even upgrade — just return
+		http.Error(writer, "WebSocket upgrade failed", http.StatusInternalServerError)
+		return
 	}
 
-	if len(errorMap) > 0 {
-		errMsg, _ := json.Marshal(map[string]any{
-			"type":   "error",
-			"errors": errorMap,
-		})
-		conn.WriteMessage(websocket.TextMessage, errMsg)
-	}
-
-	fmt.Println("got here2")
-
+	// Save and clean up connection
 	connections[userUUID] = conn
 	defer func() {
 		conn.Close()
@@ -53,27 +44,24 @@ func (h *Handler) WebSocket(writer http.ResponseWriter, request *http.Request) {
 	}()
 
 	for {
+		// Reset validation errors on every message
+		errorMap := map[string]string{}
+
 		_, data, err := conn.ReadMessage()
 		if err != nil {
-			errorMap["internal"] = "error reading websocket message"
-			break
+			fmt.Println("Error reading message:", err)
+			break // break on client disconnect or read failure
 		}
 
 		var msg model.IncomingMessage
 		err = json.Unmarshal(data, &msg)
 		if err != nil {
-			errorMap["internal"] = "error unmarshalling json"
-			break
+			errorMap["internal"] = "invalid JSON format"
 		}
 
 		if msg.Text == "" {
 			errorMap["text"] = "message text cannot be empty"
 		}
-
-		//if msg.SenderID != userUUID {
-		//	errorMap["sender"] = "invalid sender"
-		//}
-
 		if msg.ConversationID <= 0 {
 			errorMap["conversation"] = "invalid conversation id"
 		}
@@ -83,16 +71,18 @@ func (h *Handler) WebSocket(writer http.ResponseWriter, request *http.Request) {
 				"type":   "error",
 				"errors": errorMap,
 			})
-			conn.WriteMessage(websocket.TextMessage, errMsg)
-			break
+			_ = conn.WriteMessage(websocket.TextMessage, errMsg)
+			continue
 		}
 
+		// Message is valid, insert into DB
 		createdAt := time.Now()
 		var id int
-		query := "INSERT INTO messages (conversation_id,sender_id, text,created_at) VALUES($1,$2,$3,$4) RETURNING id"
+		query := "INSERT INTO messages (conversation_id, sender_id, text, created_at) VALUES ($1, $2, $3, $4) RETURNING id"
 		err = h.Config.DB.QueryRow(ctx, query, msg.ConversationID, userUUID, msg.Text, createdAt).Scan(&id)
 		if err != nil {
-			h.Config.Log.Panic("failed to query into database", zap.Error(err))
+			h.Config.Log.Error("failed to insert message", zap.Error(err))
+			continue // do not panic, just skip this one
 		}
 
 		stored := model.Message{
@@ -103,24 +93,24 @@ func (h *Handler) WebSocket(writer http.ResponseWriter, request *http.Request) {
 			CreatedAt:      createdAt,
 		}
 
+		// Broadcast to all participants
 		query = "SELECT user_id FROM conversation_participants WHERE conversation_id = $1"
 		rows, err := h.Config.DB.Query(ctx, query, msg.ConversationID)
 		if err != nil {
-			h.Config.Log.Panic("failed to query into database", zap.Error(err))
+			h.Config.Log.Error("failed to query participants", zap.Error(err))
+			continue
 		}
-
-		defer rows.Close()
-
-		for rows.Next() {
-			var participantId string
-			err = rows.Scan(&participantId)
-			if err == nil {
-				conn, ok := connections[participantId]
-				if ok {
-					conn.WriteJSON(stored)
+		func() {
+			defer rows.Close()
+			for rows.Next() {
+				var participantID string
+				if err := rows.Scan(&participantID); err == nil {
+					if participantConn, ok := connections[participantID]; ok {
+						_ = participantConn.WriteJSON(stored) // ignore write errors
+					}
 				}
 			}
-		}
+		}()
 	}
 }
 
@@ -293,4 +283,61 @@ func (h *Handler) CreateConversation(writer http.ResponseWriter, request *http.R
 	}
 	// ✅ Done — return conversation ID
 	helper.WriteSuccessResponse(writer, response)
+}
+
+func (h *Handler) GetParticipantInfo(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+	ctx := request.Context()
+
+	errorMap := map[string]string{}
+	userUUID, _ := ctx.Value("user_uuid").(string)
+	conversationID := params.ByName("id")
+
+	// start transaction
+	tx, err := h.Config.DB.Begin(ctx)
+	if err != nil {
+		h.Config.Log.Panic("failed to start transaction", zap.Error(err))
+	}
+
+	defer helper.CommitOrRollback(ctx, tx, h.Config.Log)
+
+	query := "SELECT user_id FROM conversation_participants WHERE conversation_id=$1 AND user_id!=$2"
+
+	var participantID string
+
+	err = tx.QueryRow(ctx, query, conversationID, userUUID).Scan(&participantID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			errorMap["conversation_id"] = "conversation not found"
+		} else {
+			h.Config.Log.Panic("failed to query into database", zap.Error(err))
+		}
+	}
+
+	if len(errorMap) > 0 {
+		helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+		return
+	}
+
+	var participantName string
+	query = "SELECT username FROM users WHERE id=$1"
+	err = tx.QueryRow(ctx, query, participantID).Scan(&participantName)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			errorMap["user"] = "user not found"
+		} else {
+			h.Config.Log.Panic("failed to query into database", zap.Error(err))
+		}
+	}
+
+	if len(errorMap) > 0 {
+		helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+		return
+	}
+
+	user := model.UserInfoResponse{
+		Id:       participantID,
+		Username: participantName,
+	}
+
+	helper.WriteSuccessResponse(writer, user)
 }

@@ -4,3 +4,5 @@
 # ignore .env
 .env
 
+# ignore ngrok conf
+../ngrok.yml

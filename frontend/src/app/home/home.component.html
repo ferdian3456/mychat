@@ -3,9 +3,16 @@
   <div class="max-w-4xl mx-auto">
     <header class="flex items-center justify-between py-4 border-b border-gray-300">
       <h1 class="text-2xl font-bold text-gray-800">MyChat</h1>
-      <button (click)="goToLogin()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl shadow">
-        Login
-      </button>
+      <div *ngIf="!myUser">
+          <button (click)="goToLogin()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl shadow">
+          Login
+          </button>
+      </div>
+      <div *ngIf="myUser">
+          <h1  class="text-black text-xl px-4 py-2 ">
+          Hi {{myUser.username}} !
+          </h1>
+      </div>
     </header>
 
     <section class="mt-10 text-center">
