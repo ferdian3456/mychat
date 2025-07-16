@@ -1,0 +1,8 @@
+# ignore .goland
+../.idea/
+
+# ignore .env
+.env
+
+# ignore ngrok conf
+../ngrok.yml
