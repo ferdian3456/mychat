@@ -9,8 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/julienschmidt/httprouter"
 	"go.uber.org/zap"
-	"mychat/helper"
-	"mychat/model"
+	helper2 "mychat/internal/helper"
+	model2 "mychat/internal/model"
 	"net/http"
 	"sort"
 	"strconv"
@@ -53,7 +53,7 @@ func (h *Handler) WebSocket(writer http.ResponseWriter, request *http.Request) {
 			break // break on client disconnect or read failure
 		}
 
-		var msg model.IncomingMessage
+		var msg model2.IncomingMessage
 		err = json.Unmarshal(data, &msg)
 		if err != nil {
 			errorMap["internal"] = "invalid JSON format"
@@ -85,7 +85,7 @@ func (h *Handler) WebSocket(writer http.ResponseWriter, request *http.Request) {
 			continue // do not panic, just skip this one
 		}
 
-		stored := model.Message{
+		stored := model2.Message{
 			ID:             id,
 			ConversationID: msg.ConversationID,
 			SenderID:       userUUID,
@@ -129,13 +129,13 @@ func (h *Handler) GetWebsocketToken(writer http.ResponseWriter, request *http.Re
 		h.Config.Log.Panic("failed to set key in redis db", zap.Error(err))
 	}
 
-	response := model.WebsocketTokenResponse{
+	response := model2.WebsocketTokenResponse{
 		WebsocketToken:          wsToken,
 		TokenType:               "opaque",
 		WebsocketTokenExpiresIn: durationInSecond,
 	}
 
-	helper.WriteSuccessResponse(writer, response)
+	helper2.WriteSuccessResponse(writer, response)
 }
 
 func (h *Handler) GetMessage(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
@@ -168,9 +168,9 @@ func (h *Handler) GetMessage(writer http.ResponseWriter, request *http.Request, 
 
 	defer rows.Close()
 
-	var messages []model.Message
+	var messages []model2.Message
 	for rows.Next() {
-		var m model.Message
+		var m model2.Message
 		m.ConversationID = conversationID
 		err = rows.Scan(&m.ID, &m.SenderID, &m.Text, &m.CreatedAt)
 		if err == nil {
@@ -178,20 +178,20 @@ func (h *Handler) GetMessage(writer http.ResponseWriter, request *http.Request, 
 		}
 	}
 
-	helper.WriteSuccessResponse(writer, messages)
+	helper2.WriteSuccessResponse(writer, messages)
 }
 
 func (h *Handler) CreateConversation(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
 	ctx := request.Context()
 	userUUID := ctx.Value("user_uuid").(string)
 
-	var payload model.UserConversationRequest
-	helper.ReadFromRequestBody(request, &payload)
+	var payload model2.UserConversationRequest
+	helper2.ReadFromRequestBody(request, &payload)
 
 	// block if the user includes themselves manually in json payload
 	for _, id := range payload.ParticipantIDs {
 		if id == userUUID {
-			helper.WriteErrorResponse(writer, http.StatusBadRequest, map[string]string{
+			helper2.WriteErrorResponse(writer, http.StatusBadRequest, map[string]string{
 				"participant_ids": "you should not include yourself in the participant list",
 			})
 			return
@@ -234,7 +234,7 @@ func (h *Handler) CreateConversation(writer http.ResponseWriter, request *http.R
 	}
 
 	if len(missing) > 0 {
-		helper.WriteErrorResponse(writer, http.StatusBadRequest, map[string]string{
+		helper2.WriteErrorResponse(writer, http.StatusBadRequest, map[string]string{
 			"missing_participants": strings.Join(missing, ", "),
 		})
 		return
@@ -278,11 +278,11 @@ func (h *Handler) CreateConversation(writer http.ResponseWriter, request *http.R
 		h.Config.Log.Panic("failed to query existing conversation", zap.Error(err))
 	}
 
-	response := model.UserConversationResponse{
+	response := model2.UserConversationResponse{
 		ConversationID: conversationID,
 	}
 	// ✅ Done — return conversation ID
-	helper.WriteSuccessResponse(writer, response)
+	helper2.WriteSuccessResponse(writer, response)
 }
 
 func (h *Handler) GetParticipantInfo(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
@@ -298,7 +298,7 @@ func (h *Handler) GetParticipantInfo(writer http.ResponseWriter, request *http.R
 		h.Config.Log.Panic("failed to start transaction", zap.Error(err))
 	}
 
-	defer helper.CommitOrRollback(ctx, tx, h.Config.Log)
+	defer helper2.CommitOrRollback(ctx, tx, h.Config.Log)
 
 	query := "SELECT user_id FROM conversation_participants WHERE conversation_id=$1 AND user_id!=$2"
 
@@ -314,7 +314,7 @@ func (h *Handler) GetParticipantInfo(writer http.ResponseWriter, request *http.R
 	}
 
 	if len(errorMap) > 0 {
-		helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+		helper2.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
 		return
 	}
 
@@ -330,14 +330,14 @@ func (h *Handler) GetParticipantInfo(writer http.ResponseWriter, request *http.R
 	}
 
 	if len(errorMap) > 0 {
-		helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+		helper2.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
 		return
 	}
 
-	user := model.UserInfoResponse{
+	user := model2.UserInfoResponse{
 		Id:       participantID,
 		Username: participantName,
 	}
 
-	helper.WriteSuccessResponse(writer, user)
+	helper2.WriteSuccessResponse(writer, user)
 }

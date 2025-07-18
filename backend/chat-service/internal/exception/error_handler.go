@@ -2,7 +2,7 @@ package exception
 
 import (
 	"fmt"
-	"mychat/helper"
+	"github.com/ferdian3456/mychat/backend/chat-service/internal/helper"
 	"net/http"
 )
 

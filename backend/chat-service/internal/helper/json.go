@@ -2,8 +2,8 @@ package helper
 
 import (
 	"github.com/bytedance/sonic"
+	"github.com/ferdian3456/mychat/backend/chat-service/internal/model"
 	"io"
-	"mychat/model"
 	"net/http"
 )
 
