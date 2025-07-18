@@ -65,9 +65,8 @@ func (usecase *UserUsecase) Register(ctx context.Context, payload model.UserRegi
 
 	defer helper.CommitOrRollback(ctx, tx, usecase.Log)
 
-	err = usecase.UserRepository.CheckUsernameUniqueWithTx(ctx, tx, payload.Username)
+	err = usecase.UserRepository.CheckUsernameUniqueWithTx(ctx, tx, payload.Username, errorMap)
 	if err != nil {
-		errorMap["username"] = err.Error()
 		return token, errorMap
 	}
 
@@ -86,9 +85,8 @@ func (usecase *UserUsecase) Register(ctx context.Context, payload model.UserRegi
 		Updated_at: now,
 	}
 
-	err = usecase.UserRepository.RegisterWithTx(ctx, tx, user)
-	if err != nil {
-		errorMap["internal"] = err.Error()
+	errorMap = usecase.UserRepository.RegisterWithTx(ctx, tx, user, errorMap)
+	if errorMap != nil {
 		return token, errorMap
 	}
 
@@ -142,15 +140,13 @@ func (usecase *UserUsecase) generateToken(ctx context.Context, tx pgx.Tx, userID
 		Expired_at:           refreshExpirationTime,
 	}
 
-	err = usecase.UserRepository.UpdateRefreshTokenWithTx(ctx, tx, "Revoke", userID)
-	if err != nil {
-		errorMap["internal"] = err.Error()
+	errorMap = usecase.UserRepository.UpdateRefreshTokenWithTx(ctx, tx, "Revoke", userID, errorMap)
+	if errorMap != nil {
 		return token, errorMap
 	}
 
-	err = usecase.UserRepository.AddRefreshTokenWithTx(ctx, tx, refreshTokenToDB)
-	if err != nil {
-		errorMap["internal"] = err.Error()
+	errorMap = usecase.UserRepository.AddRefreshTokenWithTx(ctx, tx, refreshTokenToDB, errorMap)
+	if errorMap != nil {
 		return token, errorMap
 	}
 
@@ -198,9 +194,8 @@ func (usecase *UserUsecase) Login(ctx context.Context, payload model.UserRegiste
 
 	defer helper.CommitOrRollback(ctx, tx, usecase.Log)
 
-	user, err := usecase.UserRepository.LoginWithTx(ctx, tx, payload.Username)
-	if err != nil {
-		errorMap["username"] = err.Error()
+	user, errorMap := usecase.UserRepository.LoginWithTx(ctx, tx, payload.Username, errorMap)
+	if errorMap != nil {
 		return token, errorMap
 	}
 
@@ -218,18 +213,29 @@ func (usecase *UserUsecase) Login(ctx context.Context, payload model.UserRegiste
 	return token, nil
 }
 
-func (usecase *UserUsecase) CheckUserExistance(ctx context.Context, userUUID string) error {
-	err := usecase.UserRepository.CheckUserExistence(ctx, userUUID)
+func (usecase *UserUsecase) CheckUserExistance(ctx context.Context, userUUID string, errorMap map[string]string) map[string]string {
+	err := usecase.UserRepository.CheckUserExistence(ctx, userUUID, errorMap)
 	if err != nil {
 		return err
 	}
 
 	return nil
 }
-func (usecase *UserUsecase) GetUserInfo(ctx context.Context) {
+func (usecase *UserUsecase) GetUserInfo(ctx context.Context, userUUID string, errorMap map[string]string) (model.UserInfoResponse, map[string]string) {
+	user, errorMap := usecase.UserRepository.GetUserInfo(ctx, userUUID, errorMap)
+	if errorMap != nil {
+		return user, errorMap
+	}
+
+	return user, nil
 
 }
 
-func (usecase *UserUsecase) GetAllUserData(ctx context.Context) {
+func (usecase *UserUsecase) GetAllUserData(ctx context.Context, userUUID string, errorMap map[string]string) ([]model.AllUserInfoResponse, map[string]string) {
+	user, errorMap := usecase.UserRepository.GetAllUserData(ctx, userUUID, errorMap)
+	if errorMap != nil {
+		return user, errorMap
+	}
 
+	return user, nil
 }

@@ -34,8 +34,13 @@ func (controller UserController) Register(writer http.ResponseWriter, request *h
 
 	response, err := controller.UserUsecase.Register(ctx, payload, errorMap)
 	if err != nil {
-		helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
-		return
+		if err["internal"] != "" {
+			helper.WriteErrorResponse(writer, http.StatusInternalServerError, errorMap)
+			return
+		} else {
+			helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+			return
+		}
 	}
 
 	accessCookie := &http.Cookie{
@@ -74,8 +79,13 @@ func (controller UserController) Login(writer http.ResponseWriter, request *http
 
 	response, err := controller.UserUsecase.Login(ctx, payload, errorMap)
 	if err != nil {
-		helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
-		return
+		if err["internal"] != "" {
+			helper.WriteErrorResponse(writer, http.StatusInternalServerError, errorMap)
+			return
+		} else {
+			helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+			return
+		}
 	}
 
 	accessCookie := &http.Cookie{
@@ -105,9 +115,41 @@ func (controller UserController) Login(writer http.ResponseWriter, request *http
 }
 
 func (controller UserController) GetUserInfo(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+	ctx := request.Context()
+	errorMap := map[string]string{}
 
+	userUUID, _ := ctx.Value("user_uuid").(string)
+
+	response, err := controller.UserUsecase.GetUserInfo(ctx, userUUID, errorMap)
+	if err != nil {
+		if err["internal"] != "" {
+			helper.WriteErrorResponse(writer, http.StatusInternalServerError, errorMap)
+			return
+		} else {
+			helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+			return
+		}
+	}
+
+	helper.WriteSuccessResponse(writer, response)
 }
 
 func (controller UserController) GetAllUserData(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+	ctx := request.Context()
+	errorMap := map[string]string{}
 
+	userUUID, _ := ctx.Value("user_uuid").(string)
+
+	response, err := controller.UserUsecase.GetAllUserData(ctx, userUUID, errorMap)
+	if err != nil {
+		if err["internal"] != "" {
+			helper.WriteErrorResponse(writer, http.StatusInternalServerError, errorMap)
+			return
+		} else {
+			helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+			return
+		}
+	}
+
+	helper.WriteSuccessResponse(writer, response)
 }

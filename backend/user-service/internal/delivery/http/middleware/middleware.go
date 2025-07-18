@@ -136,11 +136,15 @@ func (middleware *AuthMiddleware) AuthMiddleware(next httprouter.Handle) httprou
 			}
 		}
 
-		err = middleware.UserUsecase.CheckUserExistance(request.Context(), userID)
-		if err != nil {
-			errorMap["auth"] = "user not found, please register"
-			helper.WriteErrorResponse(writer, http.StatusUnauthorized, errorMap)
-			return
+		errorMap = middleware.UserUsecase.CheckUserExistance(request.Context(), userID, errorMap)
+		if errorMap != nil {
+			if errorMap["internal"] == "failed to query into database" {
+				helper.WriteErrorResponse(writer, http.StatusInternalServerError, errorMap)
+				return
+			} else {
+				helper.WriteErrorResponse(writer, http.StatusUnauthorized, errorMap)
+				return
+			}
 		}
 
 		//middleware.Log.Debug("User:" + userID)
