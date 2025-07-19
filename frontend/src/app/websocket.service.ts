@@ -10,7 +10,7 @@ export class WebsocketService {
   public messages$ = this.messagesSubject$.asObservable();
 
   connect(token: string): void {
-    const wsUrl = `ws://localhost:8090/api/ws?websocket_token=${token}`;
+    const wsUrl = `ws://localhost:8091/api/ws?websocket_token=${token}`;
     console.log("Connecting to:", wsUrl);
 
     this.socket = new WebSocket(wsUrl);

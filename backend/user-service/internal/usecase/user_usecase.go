@@ -67,6 +67,7 @@ func (usecase *UserUsecase) Register(ctx context.Context, payload model.UserRegi
 
 	err = usecase.UserRepository.CheckUsernameUniqueWithTx(ctx, tx, payload.Username, errorMap)
 	if err != nil {
+		_ = tx.Rollback(ctx)
 		return token, errorMap
 	}
 
@@ -87,11 +88,13 @@ func (usecase *UserUsecase) Register(ctx context.Context, payload model.UserRegi
 
 	errorMap = usecase.UserRepository.RegisterWithTx(ctx, tx, user, errorMap)
 	if errorMap != nil {
+		_ = tx.Rollback(ctx)
 		return token, errorMap
 	}
 
 	token, errorMap = usecase.generateToken(ctx, tx, user.Id, now, errorMap)
 	if errorMap != nil {
+		_ = tx.Rollback(ctx)
 		return token, errorMap
 	}
 
@@ -196,6 +199,7 @@ func (usecase *UserUsecase) Login(ctx context.Context, payload model.UserRegiste
 
 	user, errorMap := usecase.UserRepository.LoginWithTx(ctx, tx, payload.Username, errorMap)
 	if errorMap != nil {
+		_ = tx.Rollback(ctx)
 		return token, errorMap
 	}
 
@@ -207,6 +211,7 @@ func (usecase *UserUsecase) Login(ctx context.Context, payload model.UserRegiste
 
 	token, errorMap = usecase.generateToken(ctx, tx, user.Id, time.Now(), errorMap)
 	if errorMap != nil {
+		_ = tx.Rollback(ctx)
 		return token, errorMap
 	}
 
@@ -221,6 +226,7 @@ func (usecase *UserUsecase) CheckUserExistance(ctx context.Context, userUUID str
 
 	return nil
 }
+
 func (usecase *UserUsecase) GetUserInfo(ctx context.Context, userUUID string, errorMap map[string]string) (model.UserInfoResponse, map[string]string) {
 	user, errorMap := usecase.UserRepository.GetUserInfo(ctx, userUUID, errorMap)
 	if errorMap != nil {

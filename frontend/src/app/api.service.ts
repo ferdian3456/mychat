@@ -7,6 +7,7 @@ import { HttpClient } from "@angular/common/http";
 export class ApiService {
 
   baseUrl = "http://localhost:8090/";
+  chatUrl = "http://localhost:8091/";
 
   constructor(private http: HttpClient) {}
 
@@ -27,18 +28,18 @@ export class ApiService {
   }
 
   createOrGetConversation(url:string,data:any) {
-    return this.http.post(this.baseUrl + url, data, { withCredentials: true});
+    return this.http.post(this.chatUrl + url, data, { withCredentials: true});
   }
 
   getAllParticipantInfo(url:string){
-    return this.http.get(this.baseUrl + url, { withCredentials: true });
+    return this.http.get(this.chatUrl + url, { withCredentials: true });
   }
 
   getAllPastMessages(url:string){
-      return this.http.get(this.baseUrl + url, { withCredentials: true });
+      return this.http.get(this.chatUrl + url, { withCredentials: true });
   }
 
   getWebsocketToken(url:string) {
-    return this.http.get(this.baseUrl + url, { withCredentials: true });
+    return this.http.get(this.chatUrl + url, { withCredentials: true });
   }
 }

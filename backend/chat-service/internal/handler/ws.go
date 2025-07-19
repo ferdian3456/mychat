@@ -44,7 +44,7 @@ func (h *Handler) WebSocket(writer http.ResponseWriter, request *http.Request) {
 	}()
 
 	for {
-		// Reset validation errors on every message
+		// Reset validation errontroors on every message
 		errorMap := map[string]string{}
 
 		_, data, err := conn.ReadMessage()

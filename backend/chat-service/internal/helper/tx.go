@@ -7,7 +7,8 @@ import (
 )
 
 func CommitOrRollback(ctx context.Context, tx pgx.Tx, log *zap.Logger) {
-	if r := recover(); r != nil { // panic, then rollback then re panic
+	r := recover()
+	if r != nil { // panic, then rollback then re panic
 		err := tx.Rollback(ctx)
 		if err != nil {
 			log.Fatal("Rollback failed", zap.Error(err))
