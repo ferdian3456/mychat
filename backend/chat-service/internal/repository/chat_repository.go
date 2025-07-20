@@ -3,25 +3,31 @@ package repository
 import (
 	"context"
 	"errors"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/ferdian3456/mychat/backend/chat-service/internal/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
+	"strconv"
 	"time"
 )
 
 type ChatRepository struct {
-	Log     *zap.Logger
-	DB      *pgxpool.Pool
-	DBCache *redis.ClusterClient
+	Log      *zap.Logger
+	DB       *pgxpool.Pool
+	DBCache  *redis.ClusterClient
+	Producer *kafka.Producer
+	Consumer *kafka.Consumer
 }
 
-func NewChatRepository(zap *zap.Logger, db *pgxpool.Pool, dbCache *redis.ClusterClient) *ChatRepository {
+func NewChatRepository(zap *zap.Logger, db *pgxpool.Pool, dbCache *redis.ClusterClient, kafkaProducer *kafka.Producer, kafkaConsumer *kafka.Consumer) *ChatRepository {
 	return &ChatRepository{
-		Log:     zap,
-		DB:      db,
-		DBCache: dbCache,
+		Log:      zap,
+		DB:       db,
+		DBCache:  dbCache,
+		Producer: kafkaProducer,
+		Consumer: kafkaConsumer,
 	}
 }
 
@@ -62,7 +68,7 @@ func (repository *ChatRepository) GetPreviousMessageWithChatID(ctx context.Conte
 
 func (repository *ChatRepository) GetPreviousMessage(ctx context.Context, conversationID int, limit int, errorMap map[string]string) ([]model.Message, map[string]string) {
 	query := "SELECT id, sender_id, text, created_at FROM messages WHERE conversation_id = $1 ORDER BY id DESC LIMIT $2"
-	
+
 	var messages []model.Message
 
 	rows, err := repository.DB.Query(ctx, query, conversationID, limit)
@@ -297,4 +303,91 @@ func (repository *ChatRepository) VerifyWsToken(ctx context.Context, wsToken str
 	repository.DBCache.Del(ctx, "ws_token:"+wsToken)
 
 	return userUUID, nil
+}
+
+func (repository *ChatRepository) SAddConversationMember(ctx context.Context, userUUID string, conversationID int) {
+	key := "conversation:" + strconv.Itoa(conversationID) + ":participants"
+	repository.DBCache.SAdd(ctx, key, userUUID)
+}
+
+func (repository *ChatRepository) SetUserSession(ctx context.Context, userUUID string) {
+	repository.DBCache.Set(ctx, "user:"+userUUID+":conn", "active", time.Minute)
+	repository.DBCache.Expire(ctx, "user:"+userUUID+":status", time.Minute)
+}
+
+//func (repository *ChatRepository) ConsumeConversationMessages(ctx context.Context, conversationID int, userUUID string, conn *websocket.Conn) {
+//	topic := "chat-conversation" + strconv.Itoa(conversationID)
+//	err := repository.Consumer.SubscribeTopics([]string{topic}, nil)
+//	if err != nil {
+//		return
+//	}
+//
+//	for {
+//		msg, err := repository.Consumer.ReadMessage(-1)
+//		if err != nil {
+//			break
+//		}
+//
+//		_ = conn.WriteMessage(websocket.TextMessage, msg.Value)
+//		repository.SetUserSession(ctx, userUUID)
+//	}
+//}
+
+func (repository *ChatRepository) SubscribeToRedisChannel(ctx context.Context, channel string) *redis.PubSub {
+	return repository.DBCache.Subscribe(ctx, channel)
+}
+
+func (repository *ChatRepository) ProduceToKafka(ctx context.Context, topic string, message []byte) error {
+	deliveryChan := make(chan kafka.Event, 1)
+	defer close(deliveryChan)
+
+	err := repository.Producer.Produce(&kafka.Message{
+		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+		Value:          message,
+	}, deliveryChan)
+
+	if err != nil {
+		return err
+	}
+
+	e := <-deliveryChan
+	m := e.(*kafka.Message)
+	return m.TopicPartition.Error
+}
+
+func (r *ChatRepository) GetConversationParticipantsByConversationID(ctx context.Context, conversationID int, errorMap map[string]string) ([]string, map[string]string) {
+	query := `
+		SELECT user_id 
+		FROM conversation_participants 
+		WHERE conversation_id = $1
+	`
+
+	rows, err := r.DB.Query(ctx, query, conversationID)
+	if err != nil {
+		errorMap["internal"] = "failed to query database"
+		return nil, errorMap
+	}
+	defer rows.Close()
+
+	hasData := false
+
+	var participants []string
+	for rows.Next() {
+		var userID string
+		err = rows.Scan(&userID)
+		if err != nil {
+			errorMap["internal"] = "failed to scan query result"
+			return nil, errorMap
+		}
+
+		hasData = true
+		participants = append(participants, userID)
+	}
+
+	if hasData == false {
+		errorMap["user"] = "user not found"
+		return nil, errorMap
+	}
+
+	return participants, nil
 }

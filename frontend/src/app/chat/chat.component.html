@@ -94,6 +94,7 @@
       <input
         type="text"
         [(ngModel)]="inputText"
+        (keydown.enter)="handleEnterKey()"
         class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring"
         placeholder="Type your message..."
       />

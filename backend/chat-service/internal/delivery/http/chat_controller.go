@@ -1,7 +1,9 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/ferdian3456/mychat/backend/chat-service/internal/helper"
 	"github.com/ferdian3456/mychat/backend/chat-service/internal/model"
 	"github.com/ferdian3456/mychat/backend/chat-service/internal/usecase"
@@ -18,7 +20,6 @@ var upgrader = websocket.Upgrader{
 		return true
 	},
 }
-var connections = make(map[string]*websocket.Conn)
 
 type ChatController struct {
 	ChatUsecase *usecase.ChatUsecase
@@ -131,85 +132,68 @@ func (controller ChatController) WebSocket(writer http.ResponseWriter, request *
 	ctx := request.Context()
 	userUUID, _ := ctx.Value("user_uuid").(string)
 
-	var errorMap map[string]string
-
 	connection, err := upgrader.Upgrade(writer, request, nil)
 	if err != nil {
-		errorMap["connection"] = "failed to upgrade to websocket connection"
-		helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+		helper.WriteErrorResponse(writer, http.StatusBadRequest, map[string]string{
+			"connection": "failed to upgrade websocket",
+		})
 		return
 	}
+	defer connection.Close()
 
-	// Save and clean up connection
-	connections[userUUID] = connection
-	defer func() {
-		connection.Close()
-		delete(connections, userUUID)
+	// Assign user to a Redis pubsub bucket
+	bucket := helper.GetBucketForUser(userUUID, 1024)
+	channel := fmt.Sprintf("deliver:bucket:%d", bucket)
+
+	// Create cancelable context for pubsub listener
+	pubsubCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	pubsub := controller.ChatUsecase.SubscribeToBucket(pubsubCtx, channel)
+	defer pubsub.Close()
+
+	// Start Redis pubsub listener
+	go func() {
+		ch := pubsub.Channel()
+		for {
+			select {
+			case <-pubsubCtx.Done():
+				return
+			case msg, ok := <-ch:
+				if !ok {
+					return // channel closed
+				}
+				//fmt.Println(msg.Payload)
+				if helper.MessageBelongsToUser(msg.Payload, userUUID) {
+					_ = connection.WriteMessage(websocket.TextMessage, []byte(msg.Payload))
+				}
+			}
+		}
 	}()
 
+	// WebSocket read loop
 	for {
 		_, data, err := connection.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				controller.Log.Warn("unexpected websocket close", zap.Error(err))
-			} else {
-				controller.Log.Warn("websocket closed normally", zap.Error(err))
-			}
 			break
 		}
 
 		var msg model.IncomingMessage
-		err = json.Unmarshal(data, &msg)
-		if err != nil {
-			resp := map[string]any{
+		if err := json.Unmarshal(data, &msg); err != nil {
+			_ = connection.WriteJSON(map[string]any{
 				"status": http.StatusText(http.StatusBadRequest),
-				"errors": map[string]string{
-					"message": "invalid json format",
-				},
-			}
-
-			connection.WriteJSON(resp)
+				"errors": map[string]string{"message": "invalid json format"},
+			})
 			continue
 		}
 
-		storedMsg, errorMap := controller.ChatUsecase.ProcessIncomingMessage(ctx, msg, userUUID)
-		if errorMap != nil {
-			if errorMap["internal"] != "" {
-				_ = connection.WriteJSON(map[string]any{
-					"status": http.StatusText(http.StatusInternalServerError),
-					"data":   errorMap,
-				})
-			} else {
-				_ = connection.WriteJSON(map[string]any{
-					"status": http.StatusText(http.StatusBadRequest),
-					"data":   errorMap,
-				})
-			}
-
-			continue
-		}
-
-		participants, errorMap := controller.ChatUsecase.GetParticipants(ctx, msg.ConversationID)
-		if errorMap != nil {
-			if errorMap["internal"] != "" {
-				_ = connection.WriteJSON(map[string]any{
-					"status": http.StatusText(http.StatusInternalServerError),
-					"data":   errorMap,
-				})
-			} else {
-				_ = connection.WriteJSON(map[string]any{
-					"status": http.StatusText(http.StatusBadRequest),
-					"data":   errorMap,
-				})
-			}
-
-			continue
-		}
-
-		for _, pid := range participants {
-			if participantConn, ok := connections[pid]; ok {
-				_ = participantConn.WriteJSON(storedMsg)
-			}
+		if errMap := controller.ChatUsecase.SendMessage(ctx, msg, userUUID); errMap != nil {
+			_ = connection.WriteJSON(map[string]any{
+				"status": http.StatusText(http.StatusInternalServerError),
+				"errors": map[string]string{"message": "failed to send message"},
+			})
 		}
 	}
+
+	cancel() // stop goroutine
 }

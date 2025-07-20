@@ -160,4 +160,11 @@ export class ChatComponent implements OnInit, OnDestroy {
       this.routeSub.unsubscribe();
     }
   }
+
+  handleEnterKey() {
+    if (this.inputText.trim()) {
+      this.sendMessage(this.inputText.trim());
+      this.inputText = '';
+    }
+  }
 }

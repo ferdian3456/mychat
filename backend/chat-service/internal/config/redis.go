@@ -13,7 +13,7 @@ func NewRedisCluster(config *koanf.Koanf, log *zap.Logger) *redis.ClusterClient 
 	redisURLs := config.String("REDIS_URLS")
 
 	addrs := strings.Split(redisURLs, ",")
-	
+
 	rdb := redis.NewClusterClient(&redis.ClusterOptions{
 		Addrs:        addrs,
 		ReadTimeout:  3 * time.Second,

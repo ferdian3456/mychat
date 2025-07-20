@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS messages (
-    id SERIAL PRIMARY KEY,
+    id char(36) PRIMARY KEY,
     conversation_id INTEGER NOT NULL,
     sender_id VARCHAR(36) NOT NULL,
     text TEXT NOT NULL,

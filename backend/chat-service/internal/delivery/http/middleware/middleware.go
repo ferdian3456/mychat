@@ -3,7 +3,6 @@ package middleware
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/ferdian3456/mychat/backend/chat-service/internal/helper"
 	"github.com/ferdian3456/mychat/backend/chat-service/internal/usecase"
 	"github.com/golang-jwt/jwt/v5"
@@ -43,7 +42,7 @@ func (middleware *AuthMiddleware) WebSocketAuthMiddleware(next http.HandlerFunc)
 			return
 		}
 
-		fmt.Println("ws token", wsToken)
+		//fmt.Println("ws token", wsToken)
 
 		userUUID, errorMap := middleware.ChatUsecase.VerifyWsToken(ctx, wsToken, errorMap)
 		if errorMap != nil {

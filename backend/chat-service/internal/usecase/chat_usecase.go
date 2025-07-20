@@ -2,12 +2,14 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/ferdian3456/mychat/backend/chat-service/internal/helper"
 	"github.com/ferdian3456/mychat/backend/chat-service/internal/model"
 	"github.com/ferdian3456/mychat/backend/chat-service/internal/repository"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/knadh/koanf/v2"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"sort"
 	"strconv"
@@ -145,32 +147,32 @@ func (usecase *ChatUsecase) GetWebSocketToken(ctx context.Context, userUUID stri
 	return wsTokenResponse, nil
 }
 
-func (usecase *ChatUsecase) ProcessIncomingMessage(ctx context.Context, msg model.IncomingMessage, senderUUID string) (model.Message, map[string]string) {
-	errorMap := map[string]string{}
-
-	message := model.Message{}
-
-	if msg.Text == "" {
-		errorMap["text"] = "text is required to not be empty"
-		return message, errorMap
-	}
-	if msg.ConversationID <= 0 {
-		errorMap["conversation_id"] = "conversation id is required to not be empty"
-		return message, errorMap
-	}
-
-	message.ConversationID = msg.ConversationID
-	message.SenderID = senderUUID
-	message.Text = msg.Text
-	message.CreatedAt = time.Now()
-
-	message.ID, errorMap = usecase.ChatRepository.InsertMessage(ctx, message, errorMap)
-	if errorMap != nil {
-		return message, errorMap
-	}
-
-	return message, nil
-}
+//func (usecase *ChatUsecase) ProcessIncomingMessage(ctx context.Context, msg model.IncomingMessage, senderUUID string) (model.Message, map[string]string) {
+//	errorMap := map[string]string{}
+//
+//	message := model.Message{}
+//
+//	if msg.Text == "" {
+//		errorMap["text"] = "text is required to not be empty"
+//		return message, errorMap
+//	}
+//	if msg.ConversationID <= 0 {
+//		errorMap["conversation_id"] = "conversation id is required to not be empty"
+//		return message, errorMap
+//	}
+//
+//	message.ConversationID = msg.ConversationID
+//	message.SenderID = senderUUID
+//	message.Text = msg.Text
+//	message.CreatedAt = time.Now()
+//
+//	message.ID, errorMap = usecase.ChatRepository.InsertMessage(ctx, message, errorMap)
+//	if errorMap != nil {
+//		return message, errorMap
+//	}
+//
+//	return message, nil
+//}
 
 func (usecase *ChatUsecase) GetParticipants(ctx context.Context, conversationID int) ([]string, map[string]string) {
 	return usecase.ChatRepository.GetParticipants(ctx, conversationID)
@@ -192,4 +194,54 @@ func (usecase *ChatUsecase) VerifyWsToken(ctx context.Context, wsToken string, e
 	}
 
 	return userUUID, nil
+}
+
+func (usecase *ChatUsecase) RegisterUserInConversation(ctx context.Context, userUUID string, conversationID int) {
+	usecase.ChatRepository.SAddConversationMember(ctx, userUUID, conversationID)
+	usecase.ChatRepository.SetUserSession(ctx, userUUID)
+}
+
+//func (usecase *ChatUsecase) ConsumeConversationMessages(ctx context.Context, conversationID int, userUUID string, conn *websocket.Conn) {
+//	usecase.ChatRepository.ConsumeConversationMessages(ctx, conversationID, userUUID, conn)
+//}
+
+func (usecase *ChatUsecase) SendMessage(ctx context.Context, msg model.IncomingMessage, senderUUID string) map[string]string {
+	errorMap := map[string]string{}
+
+	if msg.Text == "" {
+		errorMap["text"] = "text is required"
+		return errorMap
+	}
+
+	if msg.ConversationID == 0 {
+		errorMap["conversation_id"] = "conversation_id is required"
+		return errorMap
+	}
+
+	participantIDs, errorMap := usecase.ChatRepository.GetConversationParticipantsByConversationID(ctx, msg.ConversationID, errorMap)
+	if errorMap != nil {
+		return errorMap
+	}
+
+	message := model.Message{
+		ID:             uuid.New().String(),
+		ConversationID: msg.ConversationID,
+		SenderID:       senderUUID,
+		RecipientIDs:   participantIDs,
+		Text:           msg.Text,
+		CreatedAt:      time.Now(),
+	}
+
+	jsonPayload, _ := json.Marshal(message)
+
+	topic := "chat-conversation"
+	err := usecase.ChatRepository.ProduceToKafka(ctx, topic, jsonPayload)
+	if err != nil {
+		errorMap["internal"] = "failed to produce to kafka"
+	}
+	return errorMap
+}
+
+func (usecase *ChatUsecase) SubscribeToBucket(ctx context.Context, channel string) *redis.PubSub {
+	return usecase.ChatRepository.SubscribeToRedisChannel(ctx, channel)
 }

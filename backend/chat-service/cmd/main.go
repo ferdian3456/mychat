@@ -42,13 +42,22 @@ func main() {
 	koanf := config.NewKoanf(zap)
 	rdb := config.NewRedisCluster(koanf, zap)
 	postgresql := config.NewPostgresqlPool(koanf, zap)
+	kafkaProducer := config.NewKafkaProducer(koanf, zap)
+	kafkaConsumer := config.NewKafkaConsumer(koanf, zap)
+	
+	defer kafkaProducer.Close()
+	defer kafkaConsumer.Close()
+	defer postgresql.Close()
+	defer rdb.Close()
 
 	config.Server(&config.ServerConfig{
-		Router:  httprouter,
-		DB:      postgresql,
-		DBCache: rdb,
-		Log:     zap,
-		Config:  koanf,
+		Router:        httprouter,
+		DB:            postgresql,
+		DBCache:       rdb,
+		Log:           zap,
+		Config:        koanf,
+		KafkaProducer: kafkaProducer,
+		KafkaConsumer: kafkaConsumer,
 	})
 
 	//httprouter.POST("/api/conversation", handlers.AuthMiddleware(handlers.CreateConversation))

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/ferdian3456/mychat/backend/chat-service/internal/delivery/http"
 	"github.com/ferdian3456/mychat/backend/chat-service/internal/delivery/http/middleware"
 	"github.com/ferdian3456/mychat/backend/chat-service/internal/delivery/http/route"
@@ -14,15 +15,17 @@ import (
 )
 
 type ServerConfig struct {
-	Router  *httprouter.Router
-	DB      *pgxpool.Pool
-	DBCache *redis.ClusterClient
-	Log     *zapLog.Logger
-	Config  *koanf.Koanf
+	Router        *httprouter.Router
+	DB            *pgxpool.Pool
+	DBCache       *redis.ClusterClient
+	Log           *zapLog.Logger
+	Config        *koanf.Koanf
+	KafkaProducer *kafka.Producer
+	KafkaConsumer *kafka.Consumer
 }
 
 func Server(config *ServerConfig) {
-	chatRepository := repository.NewChatRepository(config.Log, config.DB, config.DBCache)
+	chatRepository := repository.NewChatRepository(config.Log, config.DB, config.DBCache, config.KafkaProducer, config.KafkaConsumer)
 	chatUsecase := usecase.NewChatUsecase(chatRepository, config.DB, config.Log, config.Config)
 	chatController := http.NewChatController(chatUsecase, config.Log, config.Config)
 
