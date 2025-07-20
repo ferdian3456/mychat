@@ -10,3 +10,8 @@ type Message struct {
 	Text           string    `json:"text"`
 	CreatedAt      time.Time `json:"created_at"`
 }
+
+type IncomingMessage struct {
+	ConversationID int    `json:"conversation_id"`
+	Text           string `json:"text"`
+}

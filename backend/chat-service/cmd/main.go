@@ -2,101 +2,100 @@ package main
 
 import (
 	"context"
-	"github.com/ferdian3456/mychat/backend/chat-service/internal/config"
-	"github.com/ferdian3456/mychat/backend/chat-service/internal/exception"
-	zapLog "go.uber.org/zap"
-	"net/http"
+	"encoding/json"
+	"fmt"
+	"github.com/ferdian3456/mychat/backend/chat-service/internal/helper"
+	"github.com/ferdian3456/mychat/backend/chat-service/internal/model"
+	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
+
+	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
 
-func CORS(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		origin := request.Header.Get("Origin")
-
-		if origin == "http://localhost:4200" {
-			writer.Header().Set("Access-Control-Allow-Origin", origin)
-			writer.Header().Set("Access-Control-Allow-Credentials", "true")
-			writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			writer.Header().Set("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, Authorization")
-		}
-
-		if request.Method == http.MethodOptions {
-			writer.WriteHeader(http.StatusOK)
-			return
-		}
-
-		next.ServeHTTP(writer, request)
-	})
-}
-
 func main() {
-	// Flush zap buffered log first then cancel the context for graceful shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	_ = godotenv.Load("./.env")
+
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	httprouter := config.NewHttpRouter()
-	zap := config.NewZap()
-	koanf := config.NewKoanf(zap)
-	rdb := config.NewRedisCluster(koanf, zap)
-	postgresql := config.NewPostgresqlPool(koanf, zap)
-	kafkaProducer := config.NewKafkaProducer(koanf, zap)
-	kafkaConsumer := config.NewKafkaConsumer(koanf, zap)
-	
-	defer kafkaProducer.Close()
-	defer kafkaConsumer.Close()
-	defer postgresql.Close()
-	defer rdb.Close()
-
-	config.Server(&config.ServerConfig{
-		Router:        httprouter,
-		DB:            postgresql,
-		DBCache:       rdb,
-		Log:           zap,
-		Config:        koanf,
-		KafkaProducer: kafkaProducer,
-		KafkaConsumer: kafkaConsumer,
-	})
-
-	//httprouter.POST("/api/conversation", handlers.AuthMiddleware(handlers.CreateConversation))
-	//httprouter.GET("/api/conversation/:id/participant", handlers.AuthMiddleware(handlers.GetParticipantInfo))
-	//httprouter.GET("/api/ws-token", handlers.AuthMiddleware(handlers.GetWebsocketToken))
-	//httprouter.HandlerFunc("GET", "/api/ws", handlers.WebSocketAuthMiddleware(handlers.WebSocket))
-	//httprouter.GET("/api/conversation/:id/messages", handlers.AuthMiddleware(handlers.GetMessage))
-	//httprouter.POST("/api/conversations/:id/messages", handlers.AuthMiddleware(handlers.SendMessage))
-	//httprouter.GET("/api/conversations/:id/messages", handlers.AuthMiddleware(handlers.GetMessages))
-
-	httprouter.PanicHandler = exception.ErrorHandler
-
-	GO_SERVER_PORT := koanf.String("GO_SERVER")
-
-	server := http.Server{
-		Addr:    GO_SERVER_PORT,
-		Handler: CORS(httprouter),
-	}
-
-	zap.Info("Server is running on: " + GO_SERVER_PORT)
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-
+	// Graceful shutdown
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			zap.Fatal("Error Starting Server", zapLog.Error(err))
-		}
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+		<-ch
+		cancel()
 	}()
 
-	<-stop
-	zap.Info("Got one of stop signals")
-
-	if err := server.Shutdown(ctx); err != nil {
-		zap.Warn("Timeout, forced kill!", zapLog.Error(err))
-		zap.Sync()
-		os.Exit(1)
+	kafkaBrokers := os.Getenv("KAFKA_URLS")
+	if kafkaBrokers == "" {
+		log.Fatal("KAFKA_BROKERS not set in .env")
 	}
 
-	zap.Info("Server has shut down gracefully")
-	zap.Sync()
+	// Kafka consumer setup
+	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
+		"bootstrap.servers": kafkaBrokers,
+		"group.id":          "redis-publisher-worker",
+		"auto.offset.reset": "latest",
+	})
+	if err != nil {
+		log.Fatalf("Kafka consumer error: %v", err)
+	}
+	defer consumer.Close()
+
+	err = consumer.SubscribeTopics([]string{"chat-conversation"}, nil)
+	if err != nil {
+		log.Fatalf("Subscribe failed: %v", err)
+	}
+
+	// Redis Cluster setup
+	redisURLs := os.Getenv("REDIS_URLS")
+	if redisURLs == "" {
+		log.Fatal("REDIS_URLS is not set in .env")
+	}
+	clusterAddrs := strings.Split(redisURLs, ",")
+
+	rdb := redis.NewClusterClient(&redis.ClusterOptions{
+		Addrs: clusterAddrs,
+	})
+	defer rdb.Close()
+
+	log.Println("🚀 Kafka to Redis Cluster publisher started...")
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("🛑 Shutting down")
+			return
+		default:
+			msg, err := consumer.ReadMessage(100 * time.Millisecond)
+			if err != nil {
+				continue
+			}
+
+			//log.Printf("📦 Raw Kafka Payload: %s\n", string(msg.Value))
+
+			var chat model.Message
+			if err := json.Unmarshal(msg.Value, &chat); err != nil {
+				log.Println("❌ Invalid JSON message:", err)
+				continue
+			}
+
+			//log.Printf("💬 Parsed Message: %+v\n", chat)
+
+			for _, userID := range chat.RecipientIDs {
+				bucket := helper.GetBucketForUser(userID, 1024)
+				channel := fmt.Sprintf("deliver:bucket:%d", bucket)
+
+				if err := rdb.Publish(ctx, channel, msg.Value).Err(); err != nil {
+					log.Printf("❌ Redis publish failed: %v\n", err)
+				}
+			}
+		}
+	}
 }

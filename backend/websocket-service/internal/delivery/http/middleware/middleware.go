@@ -3,8 +3,8 @@ package middleware
 import (
 	"context"
 	"errors"
-	"github.com/ferdian3456/mychat/backend/chat-service/internal/helper"
-	"github.com/ferdian3456/mychat/backend/chat-service/internal/usecase"
+	"github.com/ferdian3456/mychat/backend/websocket-service/internal/helper"
+	"github.com/ferdian3456/mychat/backend/websocket-service/internal/usecase"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/julienschmidt/httprouter"
 	"github.com/knadh/koanf/v2"

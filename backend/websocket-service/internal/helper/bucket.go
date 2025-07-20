@@ -1,8 +1,8 @@
 package helper
 
 import (
-	"chat-distributor-service/model"
 	"encoding/json"
+	"github.com/ferdian3456/mychat/backend/websocket-service/internal/model"
 	"hash/crc32"
 )
 
@@ -12,10 +12,19 @@ func GetBucketForUser(userID string, bucketCount int) int {
 }
 
 func MessageBelongsToUser(payload string, userID string) bool {
-	// Simplified: decode and check if user is a participant
 	var msg model.Message
 	if err := json.Unmarshal([]byte(payload), &msg); err != nil {
 		return false
 	}
-	return msg.SenderID == userID
+
+	if msg.SenderID == userID {
+		return true
+	}
+
+	for _, id := range msg.RecipientIDs {
+		if id == userID {
+			return true
+		}
+	}
+	return false
 }

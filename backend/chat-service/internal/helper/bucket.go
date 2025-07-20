@@ -12,19 +12,10 @@ func GetBucketForUser(userID string, bucketCount int) int {
 }
 
 func MessageBelongsToUser(payload string, userID string) bool {
+	// Simplified: decode and check if user is a participant
 	var msg model.Message
 	if err := json.Unmarshal([]byte(payload), &msg); err != nil {
 		return false
 	}
-
-	if msg.SenderID == userID {
-		return true
-	}
-
-	for _, id := range msg.RecipientIDs {
-		if id == userID {
-			return true
-		}
-	}
-	return false
+	return msg.SenderID == userID
 }
