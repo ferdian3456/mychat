@@ -1,8 +1,9 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { ApiService } from "../api.service";
 import { Router, ActivatedRoute } from "@angular/router";
 import { WebsocketService } from '../websocket.service';
 import { Subscription } from 'rxjs';
+
 
 @Component({
   selector: 'app-chat',
@@ -10,6 +11,7 @@ import { Subscription } from 'rxjs';
   styleUrl: './chat.component.css'
 })
 export class ChatComponent implements OnInit, OnDestroy {
+  @ViewChild('messagesContainer') private messagesContainer!: ElementRef;
   showSidebar = false;
   users: any[] = [];
   message: any = [];
@@ -21,6 +23,14 @@ export class ChatComponent implements OnInit, OnDestroy {
   errorMessage: string = '';
 
   resp: any;
+
+  private isUserNearBottom(): boolean {
+  const threshold = 100; // px from bottom
+  const container = this.messagesContainer.nativeElement;
+  const position = container.scrollTop + container.clientHeight;
+  const height = container.scrollHeight;
+  return position > height - threshold;
+  }
 
   // WebSocket message subscription
   private messageSub: Subscription | null = null;
@@ -93,18 +103,22 @@ export class ChatComponent implements OnInit, OnDestroy {
           this.api.getAllPastMessages(msgUrl).subscribe(
             (resp) => {
               this.resp = resp
-              this.message = this.resp.data.reverse(); // ⏮️ Reverse if needed
+              this.message = this.resp.data.reverse();
+              setTimeout(() => this.scrollToBottom(), 100); // wait for view to render
             },
             (error) => this.handleError(error)
           );
-
           // 🎯 Resubscribe with fresh conversation ID
           this.messageSub = this.websocketService.messages$.subscribe((newMsg) => {
-            if (Number(newMsg.conversation_id) === Number(this.conversation_id)) {
-              this.message.push(newMsg);
-            }
-          });
+          if (Number(newMsg.conversation_id) === Number(this.conversation_id)) {
+            const shouldAutoScroll = this.isUserNearBottom();
+            this.message.push(newMsg);
 
+            if (shouldAutoScroll) {
+              setTimeout(() => this.scrollToBottom(), 100);
+            }
+          }
+        });
         },
         (error) => this.handleError(error)
       );
@@ -167,4 +181,12 @@ export class ChatComponent implements OnInit, OnDestroy {
       this.inputText = '';
     }
   }
+
+  private scrollToBottom(): void {
+  try {
+    this.messagesContainer.nativeElement.scrollTop = this.messagesContainer.nativeElement.scrollHeight;
+  } catch (err) {
+    console.error('Scroll failed', err);
+  }
+}
 }
