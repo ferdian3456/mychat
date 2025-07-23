@@ -66,15 +66,15 @@ func (controller ChatController) GetMessage(writer http.ResponseWriter, request 
 
 func (controller ChatController) CreateConversation(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
 	ctx := request.Context()
-	var errorMap map[string]string
+	errorMap := map[string]string{}
 
 	userUUID := ctx.Value("user_uuid").(string)
 
-	var payload model.UserConversationRequest
+	var payload model.UserAddConversationRequest
 	helper.ReadFromRequestBody(request, &payload)
 
-	response, errorMap := controller.ChatUsecase.CreateConversation(ctx, payload, userUUID, errorMap)
-	if errorMap != nil {
+	response, err := controller.ChatUsecase.CreateConversation(ctx, payload, userUUID, errorMap)
+	if err != nil {
 		if errorMap["internal"] != "" {
 			helper.WriteErrorResponse(writer, http.StatusInternalServerError, errorMap)
 			return
@@ -196,4 +196,24 @@ func (controller ChatController) WebSocket(writer http.ResponseWriter, request *
 	}
 
 	cancel() // stop goroutine
+}
+
+func (controller ChatController) GetAllMyOwnConversationID(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+	ctx := request.Context()
+	userUUID, _ := ctx.Value("user_uuid").(string)
+
+	errorMap := map[string]string{}
+
+	response, errorMap := controller.ChatUsecase.GetAllMyOwnConversationID(ctx, userUUID, errorMap)
+	if errorMap != nil {
+		if errorMap["internal"] != "" {
+			helper.WriteErrorResponse(writer, http.StatusInternalServerError, errorMap)
+			return
+		} else {
+			helper.WriteErrorResponse(writer, http.StatusBadRequest, errorMap)
+			return
+		}
+	}
+
+	helper.WriteSuccessResponse(writer, response)
 }

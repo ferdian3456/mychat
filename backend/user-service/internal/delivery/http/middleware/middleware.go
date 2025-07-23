@@ -147,7 +147,7 @@ func (middleware *AuthMiddleware) AuthMiddleware(next httprouter.Handle) httprou
 			}
 		}
 
-		//middleware.Log.Debug("User:" + userID)
+		middleware.Log.Debug("User:" + userID)
 
 		ctx = context.WithValue(ctx, "user_uuid", userID)
 		request = request.WithContext(ctx)

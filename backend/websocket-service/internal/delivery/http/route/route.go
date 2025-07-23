@@ -15,6 +15,7 @@ type RouteConfig struct {
 func (c *RouteConfig) SetupRoute() {
 	c.Router.GET("/api/conversation/:id/messages", c.AuthMiddleware.AuthMiddleware(c.ChatController.GetMessage))
 	c.Router.POST("/api/conversation", c.AuthMiddleware.AuthMiddleware(c.ChatController.CreateConversation))
+	c.Router.GET("/api/conversation", c.AuthMiddleware.AuthMiddleware(c.ChatController.GetAllMyOwnConversationID))
 	c.Router.GET("/api/conversation/:id/participant", c.AuthMiddleware.AuthMiddleware(c.ChatController.GetParticipantInfo))
 	c.Router.GET("/api/ws-token", c.AuthMiddleware.AuthMiddleware(c.ChatController.GetWebSocketToken))
 	c.Router.HandlerFunc("GET", "/api/ws", c.AuthMiddleware.WebSocketAuthMiddleware(c.ChatController.WebSocket))

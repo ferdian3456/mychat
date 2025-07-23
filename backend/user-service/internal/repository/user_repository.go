@@ -91,7 +91,7 @@ func (repository *UserRepository) CheckUserExistence(ctx context.Context, userUU
 	err := repository.DB.QueryRow(ctx, query, userUUID).Scan(&username)
 
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if err == pgx.ErrNoRows {
 			errorMap["user"] = "user not found"
 			return errorMap
 		}

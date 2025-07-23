@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/ferdian3456/mychat/backend/websocket-service/internal/helper"
 	"github.com/ferdian3456/mychat/backend/websocket-service/internal/model"
 	"github.com/ferdian3456/mychat/backend/websocket-service/internal/repository"
@@ -51,46 +52,36 @@ func (usecase *ChatUsecase) GetMessage(ctx context.Context, conversationID int, 
 	return messages, nil
 }
 
-func (usecase *ChatUsecase) CreateConversation(ctx context.Context, payload model.UserConversationRequest, userUUID string, errorMap map[string]string) (model.UserConversationResponse, map[string]string) {
+func (usecase *ChatUsecase) CreateConversation(ctx context.Context, payload model.UserAddConversationRequest, userUUID string, errorMap map[string]string) (model.UserConversationResponse, map[string]string) {
 	var conversation model.UserConversationResponse
 
-	for _, id := range payload.ParticipantIDs {
-		if id == userUUID {
-			errorMap["participant_id"] = "you should not include yourself in the participant list"
-			return conversation, errorMap
-		}
+	if payload.Username == "" {
+		errorMap["username"] = "username is required to not be empty"
+		return conversation, errorMap
+	} else if len(payload.Username) < 4 {
+		errorMap["username"] = "username must be at least 4 characters"
+		return conversation, errorMap
+	} else if len(payload.Username) > 22 {
+		errorMap["username"] = "username must be at most 22 characters"
+		return conversation, errorMap
 	}
 
-	// ensure the current user is included into payload
-	participantSet := map[string]struct{}{
-		userUUID: {},
-	}
-
-	for _, id := range payload.ParticipantIDs {
-		participantSet[id] = struct{}{}
-	}
-
-	allParticipants := make([]string, 0, len(participantSet))
-	for id := range participantSet {
-		allParticipants = append(allParticipants, id)
-	}
-
-	sort.Strings(allParticipants)
-
-	// start transaction
 	tx, err := usecase.DB.Begin(ctx)
 	if err != nil {
 		errorMap["internal"] = "failed to start transaction"
 		return conversation, errorMap
 	}
 
-	defer helper.CommitOrRollback(ctx, tx, usecase.Log)
-
-	errorMap = usecase.ChatRepository.VerifyAllUserID(ctx, tx, allParticipants, errorMap)
+	// prevent adding self
+	var targetUserID string
+	targetUserID, errorMap = usecase.ChatRepository.GetUserIDByUsername(ctx, tx, payload.Username, userUUID, errorMap)
 	if errorMap != nil {
-		_ = tx.Rollback(ctx)
 		return conversation, errorMap
 	}
+
+	// collect both participants and sort
+	allParticipants := []string{userUUID, targetUserID}
+	sort.Strings(allParticipants)
 
 	conversationID, errorMap := usecase.ChatRepository.GetConversationIDByParticipants(ctx, tx, allParticipants, errorMap)
 	if errorMap != nil {
@@ -99,6 +90,11 @@ func (usecase *ChatUsecase) CreateConversation(ctx context.Context, payload mode
 	}
 
 	conversation.ConversationID = conversationID
+	err = tx.Commit(ctx)
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	return conversation, nil
 }
 
@@ -244,4 +240,15 @@ func (usecase *ChatUsecase) SendMessage(ctx context.Context, msg model.IncomingM
 
 func (usecase *ChatUsecase) SubscribeToBucket(ctx context.Context, channel string) *redis.PubSub {
 	return usecase.ChatRepository.SubscribeToRedisChannel(ctx, channel)
+}
+
+func (usecase *ChatUsecase) GetAllMyOwnConversationID(ctx context.Context, userUUID string, errorMap map[string]string) ([]model.UserAllConversationIDResponse, map[string]string) {
+	var conversations []model.UserAllConversationIDResponse
+
+	conversations, errorMap = usecase.ChatRepository.GetAllMyOwnConversationID(ctx, userUUID, errorMap)
+	if errorMap != nil {
+		return conversations, errorMap
+	}
+
+	return conversations, nil
 }

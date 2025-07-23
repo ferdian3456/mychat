@@ -1,11 +1,14 @@
 <div class="flex h-screen">
   <!-- Sidebar desktop -->
   <aside class="hidden md:block w-64 bg-gray-100 border-r">
-    <div class="p-4 font-bold text-lg border-b">Chats</div>
+    <div class="p-4 font-bold text-lg border-b flex justify-between items-center">
+      <span>Chats</span>
+      <button (click)="onAddUser()" class="text-blue-600 text-xl hover:text-blue-800">+</button>
+    </div>
     <ul class="divide-y">
       <li
         *ngFor="let user of users"
-        (click)="goToChat(user.id)"
+        (click)="goToChat(user.conversation_id)"
         class="p-4 hover:bg-gray-200 cursor-pointer"
       >
         {{ user.username }}
@@ -23,15 +26,18 @@
       class="w-64 h-full bg-white shadow-lg p-4"
       (click)="$event.stopPropagation()"
     >
-      <div class="font-bold text-lg mb-4">Chats</div>
+      <div class="font-bold text-lg mb-4 flex justify-between items-center">
+        <span>Chats</span>
+        <button (click)="onAddUser()" class="text-blue-600 text-xl hover:text-blue-800">+</button>
+      </div>
       <ul class="divide-y">
-      <li
-        *ngFor="let user of users"
-        (click)="goToChat(user.id)"
-        class="p-4 hover:bg-gray-200 cursor-pointer"
-      >
-        {{ user.username }}
-      </li>
+        <li
+          *ngFor="let user of users"
+          (click)="goToChat(user.conversation_id)"
+          class="p-4 hover:bg-gray-200 cursor-pointer"
+        >
+          {{ user.username }}
+        </li>
       </ul>
     </div>
   </div>
@@ -67,6 +73,45 @@
     <!-- Placeholder -->
     <div class="flex-1 flex items-center justify-center text-gray-500">
       Choose a conversation from the list.
+    </div>
+  </div>
+
+  <!-- Add User Modal -->
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+    *ngIf="showAddUserModal"
+  >
+    <div class="bg-white w-11/12 max-w-sm p-6 rounded shadow-lg">
+      <h2 class="text-lg font-semibold mb-4">Start a new chat</h2>
+      <div *ngIf="loading" class="flex justify-center mb-4">
+        <div class="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+      <!-- Show error message -->
+      <div *ngIf="usernameErrorMessage" class="bg-red-100 text-red-700 p-2 mb-4 rounded">
+        {{ usernameErrorMessage }}
+      </div>
+
+      <input
+        type="text"
+        [(ngModel)]="newUsername"
+        placeholder="Enter username"
+        class="w-full border border-gray-300 rounded p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <div class="flex justify-end space-x-2">
+        <button
+          (click)="showAddUserModal = false; errorMessage = ''"
+          class="px-4 py-2 text-gray-700 hover:underline"
+        >
+          Cancel
+        </button>
+        <button
+          [disabled]="loading"
+          (click)="startChatWithUsername()"
+          class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Start Chat
+        </button>
+      </div>
     </div>
   </div>
 </div>

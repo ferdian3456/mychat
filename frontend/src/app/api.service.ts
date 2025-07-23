@@ -27,6 +27,10 @@ export class ApiService {
     return this.http.get(this.baseUrl + url, { withCredentials: true });
   }
 
+  getAllConversation(url:string){
+    return this.http.get(this.chatUrl + url, { withCredentials: true });
+  }
+
   createOrGetConversation(url:string,data:any) {
     return this.http.post(this.chatUrl + url, data, { withCredentials: true});
   }

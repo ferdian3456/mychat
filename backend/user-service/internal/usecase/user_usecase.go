@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"github.com/ferdian3456/mychat/backend/user-service/internal/helper"
 	"github.com/ferdian3456/mychat/backend/user-service/internal/model"
 	"github.com/ferdian3456/mychat/backend/user-service/internal/repository"
@@ -63,8 +64,6 @@ func (usecase *UserUsecase) Register(ctx context.Context, payload model.UserRegi
 		return token, errorMap
 	}
 
-	defer helper.CommitOrRollback(ctx, tx, usecase.Log)
-
 	err = usecase.UserRepository.CheckUsernameUniqueWithTx(ctx, tx, payload.Username, errorMap)
 	if err != nil {
 		_ = tx.Rollback(ctx)
@@ -96,6 +95,11 @@ func (usecase *UserUsecase) Register(ctx context.Context, payload model.UserRegi
 	if errorMap != nil {
 		_ = tx.Rollback(ctx)
 		return token, errorMap
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		fmt.Println(err)
 	}
 
 	return token, nil

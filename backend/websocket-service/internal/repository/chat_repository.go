@@ -132,6 +132,21 @@ func (repository *ChatRepository) VerifyAllUserID(ctx context.Context, tx pgx.Tx
 	return nil
 }
 
+func (repository *ChatRepository) GetUserIDByUsername(ctx context.Context, tx pgx.Tx, username string, userUUID string, errorMap map[string]string) (string, map[string]string) {
+	var userID string
+	query := `SELECT id FROM users WHERE username = $1 AND id!=$2 LIMIT 1`
+	err := tx.QueryRow(ctx, query, username, userUUID).Scan(&userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			errorMap["username"] = "username not found"
+			return userID, errorMap
+		}
+		errorMap["internal"] = "failed to query into database"
+		return userID, errorMap
+	}
+	return userID, nil
+}
+
 func (repository *ChatRepository) GetConversationIDByParticipants(ctx context.Context, tx pgx.Tx, allParticipants []string, errorMap map[string]string) (int, map[string]string) {
 	query := `
 	SELECT cp.conversation_id
@@ -390,4 +405,46 @@ func (r *ChatRepository) GetConversationParticipantsByConversationID(ctx context
 	}
 
 	return participants, nil
+}
+
+func (repository *ChatRepository) GetAllMyOwnConversationID(ctx context.Context, userUUID string, errorMap map[string]string) ([]model.UserAllConversationIDResponse, map[string]string) {
+	query := `
+	SELECT cp.conversation_id, u.username
+	FROM conversation_participants cp
+	JOIN conversation_participants cp2 ON cp.conversation_id = cp2.conversation_id
+	JOIN users u ON u.id = cp2.user_id
+	WHERE cp.user_id = $1
+	  AND cp2.user_id != $1
+	ORDER BY cp.conversation_id
+	`
+
+	conversations := []model.UserAllConversationIDResponse{}
+
+	rows, err := repository.DB.Query(ctx, query, userUUID)
+	if err != nil {
+		errorMap["internal"] = "failed to query database"
+		return conversations, errorMap
+	}
+	defer rows.Close()
+
+	hasData := false
+
+	for rows.Next() {
+		var conversation model.UserAllConversationIDResponse
+		err = rows.Scan(&conversation.ConversationID, &conversation.Username)
+		if err != nil {
+			errorMap["internal"] = "failed to scan query result"
+			return nil, errorMap
+		}
+
+		hasData = true
+		conversations = append(conversations, conversation)
+	}
+
+	if !hasData {
+		errorMap["conversation"] = "conversation not found"
+		return nil, errorMap
+	}
+
+	return conversations, nil
 }
