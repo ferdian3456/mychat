@@ -178,6 +178,16 @@ export class ChatComponent implements OnInit, OnDestroy {
     }
   }
 
+  shouldShowDateSeparator(index: number): boolean {
+  if (index === 0) return true;
+
+  const current = new Date(this.message[index].created_at);
+  const previous = new Date(this.message[index - 1].created_at);
+
+  return current.toDateString() !== previous.toDateString();
+}
+
+
   ngOnDestroy() {
     if (this.messageSub) {
       this.messageSub.unsubscribe();
