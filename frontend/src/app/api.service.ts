@@ -27,6 +27,10 @@ export class ApiService {
     return this.http.get(this.baseUrl + url, { withCredentials: true });
   }
 
+  getMessagesWithBeforeId(url: string) {
+    return this.http.get(this.baseUrl + url, { withCredentials: true });
+  }
+
   getAllConversation(url:string){
     return this.http.get(this.chatUrl + url, { withCredentials: true });
   }

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit,ViewChild,ElementRef } from '@angular/core';
 import { ApiService } from '../api.service';
 import { Router } from '@angular/router';
 
@@ -8,6 +8,7 @@ import { Router } from '@angular/router';
   styleUrls: ['./chat-list.component.css'],
 })
 export class ChatListComponent implements OnInit {
+  @ViewChild('usernameInput') usernameInputRef!: ElementRef;
   showSidebar = false;
   loading = false;
 
@@ -80,9 +81,15 @@ export class ChatListComponent implements OnInit {
   }
 
   onAddUser() {
-    this.newUsername = '';
-    this.showAddUserModal = true;
+  this.newUsername = '';
+  this.showAddUserModal = true;
+
+    // Focus input after modal is visible
+    setTimeout(() => {
+      this.usernameInputRef?.nativeElement.focus();
+    }, 100);
   }
+
 
   startChatWithUsername() {
     const enteredUsername = this.newUsername.trim();

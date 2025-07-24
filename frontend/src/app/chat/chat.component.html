@@ -110,6 +110,7 @@
     <!-- Input -->
     <div class="border-t p-4 bg-white flex gap-2">
       <input
+        #chatInput
         type="text"
         [(ngModel)]="inputText"
         (keydown.enter)="handleEnterKey()"
@@ -141,8 +142,10 @@
       </div>
 
       <input
+        #usernameInput
         type="text"
         [(ngModel)]="newUsername"
+        (keydown.enter)="startChatWithUsername()"
         placeholder="Enter username"
         class="w-full border border-gray-300 rounded p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />

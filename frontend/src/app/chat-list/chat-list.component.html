@@ -76,7 +76,7 @@
     </div>
   </div>
 
-  <!-- Add User Modal -->
+   <!-- Add User Modal -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
     *ngIf="showAddUserModal"
@@ -92,8 +92,10 @@
       </div>
 
       <input
+        #usernameInput
         type="text"
         [(ngModel)]="newUsername"
+        (keydown.enter)="startChatWithUsername()"
         placeholder="Enter username"
         class="w-full border border-gray-300 rounded p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />

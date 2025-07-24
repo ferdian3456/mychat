@@ -12,6 +12,8 @@ import { Subscription } from 'rxjs';
 })
 export class ChatComponent implements OnInit, OnDestroy {
   @ViewChild('messagesContainer') private messagesContainer!: ElementRef;
+  @ViewChild('usernameInput') usernameInputRef!: ElementRef;
+  @ViewChild('chatInput') chatInputRef!: ElementRef;
   showSidebar = false;
   users: any[] = [];
   message: any = [];
@@ -82,6 +84,11 @@ export class ChatComponent implements OnInit, OnDestroy {
   onAddUser() {
     this.newUsername = '';
     this.showAddUserModal = true;
+
+    // Give the modal time to render before focusing
+    setTimeout(() => {
+      this.usernameInputRef?.nativeElement.focus();
+    }, 100);
   }
 
   loadConversationData(conversation_id: string) {
@@ -114,9 +121,12 @@ export class ChatComponent implements OnInit, OnDestroy {
           // ⏳ Get messages for new conversation
           this.api.getAllPastMessages(msgUrl).subscribe(
             (resp) => {
-              this.resp = resp
+              this.resp = resp;
               this.message = this.resp.data.reverse();
-              setTimeout(() => this.scrollToBottom(), 100); // wait for view to render
+              setTimeout(() => {
+                this.scrollToBottom();
+                this.chatInputRef?.nativeElement.focus();  // 👈 Focus here
+              }, 100);
             },
             (error) => this.handleError(error)
           );

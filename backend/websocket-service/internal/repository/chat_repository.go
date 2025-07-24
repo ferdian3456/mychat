@@ -67,11 +67,11 @@ func (repository *ChatRepository) GetPreviousMessageWithChatID(ctx context.Conte
 }
 
 func (repository *ChatRepository) GetPreviousMessage(ctx context.Context, conversationID int, limit int, errorMap map[string]string) ([]model.Message, map[string]string) {
-	query := "SELECT id, sender_id, text, created_at FROM messages WHERE conversation_id = $1 ORDER BY id DESC LIMIT $2"
+	query := "SELECT id, sender_id, text, created_at FROM messages WHERE conversation_id = $1 ORDER BY id DESC "
 
 	var messages []model.Message
 
-	rows, err := repository.DB.Query(ctx, query, conversationID, limit)
+	rows, err := repository.DB.Query(ctx, query, conversationID)
 	if err != nil {
 		errorMap["internal"] = "failed to query into database"
 		return messages, errorMap
