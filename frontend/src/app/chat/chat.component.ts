@@ -70,15 +70,18 @@ export class ChatComponent implements OnInit, OnDestroy {
         this.loadConversationData(id);
       }
 
-      // Also load all sidebar users once
-      this.api.getAllUserInfo('api/users').subscribe(
-        (resp) => {
-          this.resp = resp
-          this.users = this.resp.data;
-        },
-        (error) => this.handleError(error)
-      );
-    });
+      this.api.getAllConversation('api/conversation').subscribe(
+          (resp) => {
+            this.resp = resp;
+            this.users = this.resp.data 
+            console.log(this.resp)
+          },
+          (error) => {
+            this.handleError(error);
+          }
+        );
+      },
+    );
   }
 
   onAddUser() {
@@ -132,6 +135,9 @@ export class ChatComponent implements OnInit, OnDestroy {
           );
           // 🎯 Resubscribe with fresh conversation ID
           this.messageSub = this.websocketService.messages$.subscribe((newMsg) => {
+            console.log("WebSocket message received:", newMsg);
+            console.log("created_at raw:", newMsg.created_at);
+            console.log("Parsed as:", new Date(newMsg.created_at))
           if (Number(newMsg.conversation_id) === Number(this.conversation_id)) {
             const shouldAutoScroll = this.isUserNearBottom();
             this.message.push(newMsg);
@@ -149,6 +155,39 @@ export class ChatComponent implements OnInit, OnDestroy {
   );
 }
 
+  shouldShowDateSeparator(index: number): boolean {
+  if (index === 0) return true;
+
+  const currentDate = this.getDatePart(this.message[index].created_at);
+  const prevDate = this.getDatePart(this.message[index - 1].created_at);
+
+  return currentDate !== prevDate;
+  }
+
+  getDatePart(dateString: string): string {
+    // Extract just the date portion (YYYY-MM-DD)
+    const match = dateString.match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : '';
+  }
+
+  formatDateLabel(dateStr: string): string {
+    // Convert "2025-07-24" to "Jul 24, 2025"
+    const [year, month, day] = dateStr.split('-');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${monthNames[Number(month) - 1]} ${day}, ${year}`;
+  }
+
+  getLocalTimeString(dateString: string): string {
+  // Match HH:MM from ISO string like "2025-07-24T17:50:00.000000+07:00"
+  const match = dateString.match(/T(\d{2}):(\d{2})/);
+  if (match) {
+    const [, hours, minutes] = match;
+    return `${hours}:${minutes}`;
+  }
+  return 'Invalid time';
+  }
+
 
   sendMessage(text: string) {
     const msg = {
@@ -160,17 +199,18 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   goToChat(userid: string) {
-    const data = {
-      participant_ids: [userid]
-    };
-    this.api.createOrGetConversation('api/conversation', data).subscribe(
-      (resp) => {
-        this.resp = resp
-        const newConversationId = this.resp.data.conversation_id;
-        this.router.navigate(['/chat', newConversationId]);
-      },
-      (error) => this.handleError(error)
-    );
+    console.log(userid)
+    this.router.navigate(['/chat/', userid])
+    // this.api.createOrGetConversation('api/conversation', this.request).subscribe(
+    //   (resp) => {
+    //     this.resp = resp;
+    //     this.conversation_id = this.resp.data.conversation_id;
+    //     this.router.navigate(['/chat/', this.conversation_id]);
+    //   },
+    //   (error) => {
+    //     this.handleError(error);
+    //   }
+    // );
   }
 
   handleError(error: any, redirectToLogin: boolean = false) {
@@ -188,14 +228,6 @@ export class ChatComponent implements OnInit, OnDestroy {
     }
   }
 
-  shouldShowDateSeparator(index: number): boolean {
-  if (index === 0) return true;
-
-  const current = new Date(this.message[index].created_at);
-  const previous = new Date(this.message[index - 1].created_at);
-
-  return current.toDateString() !== previous.toDateString();
-}
 
 
   ngOnDestroy() {

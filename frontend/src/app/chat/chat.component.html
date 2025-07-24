@@ -74,10 +74,13 @@
    <!-- Messages -->
   <div #messagesContainer class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
     <ng-container *ngFor="let msg of message; let i = index">
-      
       <!-- 📅 Date Separator -->
-      <div *ngIf="shouldShowDateSeparator(i)" class="text-center text-sm text-gray-500 my-4">
-        {{ msg.created_at | date: 'fullDate' }}
+      <div *ngIf="shouldShowDateSeparator(i)" class="flex items-center justify-center my-4">
+        <div class="border-t border-gray-300 flex-grow mr-2"></div>
+        <div class="text-sm text-gray-600 font-medium">
+          {{ formatDateLabel(getDatePart(message[i].created_at)) }}
+        </div>
+        <div class="border-t border-gray-300 flex-grow ml-2"></div>
       </div>
 
       <!-- 💬 Message Bubble -->
@@ -94,12 +97,12 @@
             {{ msg.text }}
           </div>
           <div class="text-xs text-gray-500 mt-1"
-              [ngClass]="{
-                'text-right': msg.sender_id === myUser.id,
-                'text-left': msg.sender_id !== myUser.id
-              }">
-            {{ msg.created_at | date: 'shortTime' }}
-          </div>
+            [ngClass]="{
+              'text-right': msg.sender_id === myUser.id,
+              'text-left': msg.sender_id !== myUser.id
+            }">
+          {{ getLocalTimeString(msg.created_at) }}
+        </div>
         </div>
       </div>
     </ng-container>
